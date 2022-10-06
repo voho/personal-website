@@ -27,15 +27,15 @@ function Hero() {
       </div>
 
       <div className="hero-content">
-        <h1>Vojta Hordějčuk</h1>
-        <h2>alias voho</h2>
+
 
         <div className="two-cols">
           <div className="two-cols-inner">
-            <p>Creative Developer<br />Electronic Music Producer<br />Woodworker<br />Father</p>
+            <h1>Vojta Hordějčuk</h1>
+            <h2>alias voho</h2>
           </div>
           <div className="two-cols-inner">
-            <p><small><a href="mailto:vojtech&#46;hordejcuk&#64;gmail&#46;com">vojtech&#46;hordejcuk&#64;gmail&#46;com</a></small></p>
+            <p>Creative Developer<br />Electronic Music Producer<br />Woodworker<br />Father</p>
           </div>
         </div>
       </div>
