@@ -21,25 +21,16 @@ function getRandomImage() {
 function Hero() {
   return (
     <div className="hero">
-
       <div className="hero-image">
         <img src={getRandomImage()} alt="Just an image" />
       </div>
-
-      <div className="hero-content">
-
-
-        <div className="two-cols">
-          <div className="two-cols-inner">
-            <h1>Vojta Hordějčuk</h1>
-            <h2>alias voho</h2>
-          </div>
-          <div className="two-cols-inner">
-            <p>Creative Developer<br />Electronic Music Producer<br />Woodworker<br />Father</p>
-          </div>
-        </div>
+      <div className="hero-name">
+        <h1>Vojta Hordějčuk</h1>
+        <h2>alias voho</h2>
       </div>
-
+      <div className="hero-skills">
+        <p>Creative Developer<br />Electronic Music Producer<br />Woodworker<br />Father</p>
+      </div>
       <div className="hero-links">
         <ul>
           <li><FontAwesomeIcon icon={faLinkedin} size="2x" fixedWidth color='#9BA5AE' /> <a href="http://www.linkedin.com/in/vohocz">LinkedIn</a></li>
@@ -49,7 +40,6 @@ function Hero() {
           <li><FontAwesomeIcon icon={faInstagramSquare} size="2x" fixedWidth color='#9BA5AE' /> <a href="https://www.instagram.com/vohocz/">Instagram</a></li>
         </ul>
       </div>
-
     </div>
   );
 }

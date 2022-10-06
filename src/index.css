@@ -5,7 +5,7 @@ body {
   background: linear-gradient(30deg, #040308, #AD4A28, #DCB697, #9BA5AE, #3E5879, #020B1A);
   background-size: 400% 400%;
   font-family: 'Ubuntu', sans-serif;
-  font-size: 15pt;
+  font-size: 16pt;
   line-height: 1.5;
   margin: 0;
   padding: 0;
@@ -47,30 +47,46 @@ a:hover {
   flex-direction: row;
   align-items: center;
   column-gap: 2em;
+  row-gap: 1em;
+  flex-wrap: wrap;
   opacity: 0.9;
 }
 
 .hero-image {
   flex-grow: 0;
   text-align: center;
-  width: 30%;
+  flex-grow: 0.5;
+  flex-shrink: 1;
 }
 
 .hero-image img {
   border-radius: 5pt;
-  box-shadow: 0 1ex 1em #999;
+  box-shadow: 0 1ex 1em #9BA5AE;
   max-width: 100%;
   max-height: 50vh;
+  min-width: 15em;
 }
 
-.hero-content {
+.hero-name {
   color: gray;
-  flex-grow: 2;
+  padding: 1em;
+  flex-grow: 1.5;
+  flex-shrink: 0.5;
+  min-width: 20em;
+}
+
+.hero-skills {
+  color: #9BA5AE;
+  padding: 1em;
+  flex-grow: 1;
+  flex-shrink: 0.5;
+  min-width: 15em;
 }
 
 .hero-links {
-  flex-grow: 1;
-  padding: 1%;
+  flex-grow: 0.5;
+  flex-shrink: 0.5;
+  padding: 1em;
 }
 
 .hero-links ul {
@@ -99,7 +115,7 @@ a:hover {
 
 h1 {
   color: black;
-  font-size: 200%;
+  font-size: 3vw;
   line-height: 1.2;
   margin: 0;
   padding: 1% 0;
@@ -107,7 +123,7 @@ h1 {
 
 h2 {
   opacity: 0.7;
-  font-size: 150%;
+  font-size: 2vw;
   line-height: 1.2;
   margin: 0;
   padding: 1% 0;
@@ -123,23 +139,4 @@ h2 em {
 p {
   margin: 0;
   padding: 1em 0 1ex;
-}
-
-.two-cols {
-  column-gap: 1em;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-}
-
-.two-cols-inner:first-of-type {
-  flex-grow: 1;
-}
-
-.two-cols-inner:last-of-type {
-  flex-grow: 0.6;
-}
-
-small {
-  font-size: 80%;
 }
