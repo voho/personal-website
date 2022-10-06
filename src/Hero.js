@@ -29,7 +29,7 @@ function Hero() {
         <h2>alias voho</h2>
       </div>
       <div className="hero-skills">
-        <p>Creative Developer<br />Electronic Music Producer<br />Woodworker<br />Father</p>
+        <p>Creative Developer<br />Electronic Music Producer<br />Woodworker<br />Father<br />ex-Expat</p>
       </div>
       <div className="hero-links">
         <ul>
