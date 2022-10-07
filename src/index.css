@@ -38,7 +38,7 @@ a:hover {
 
 .hero {
   background-color: #fff;
-  background: radial-gradient(ellipse at top, #eee, #ddd, #fff, #eee, #ddd);
+  background: radial-gradient(ellipse at top, #eee, #ccc, #fff, #eee, #ddd);
   background-size: 400% 400%;
   min-height: 30em;
   margin: 2% 0;
@@ -49,7 +49,7 @@ a:hover {
   column-gap: 2em;
   row-gap: 1em;
   flex-wrap: wrap;
-  opacity: 0.75;
+  opacity: 0.95;
   animation: sunset 50s ease infinite;
 }
 
