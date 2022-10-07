@@ -28,12 +28,10 @@ body {
 a {
   color: black;
   text-decoration: none;
-  transition: 300ms;
 }
 
 a:hover {
   color: blue;
-  transition: 300ms;
 }
 
 .hero {
@@ -56,15 +54,18 @@ a:hover {
 .hero-image {
   flex-grow: 0;
   text-align: center;
-  flex-grow: 0.5;
+  flex-grow: 1;
   flex-shrink: 1;
 }
 
 .hero-image img {
-  border-radius: 5pt;
+  background-color: black;
+  border: 0.5vh solid white;
+  box-shadow: 0 1vh 5vh #aaa;
   max-width: 100%;
   max-height: 50vh;
   min-width: 15em;
+  padding: 2vh;
 }
 
 .hero-name {
@@ -75,6 +76,7 @@ a:hover {
 }
 
 .hero-skills {
+  border-top: 0.5vh solid black;
   color: #999;
   column-gap: 1em;
   display: flex;
@@ -130,7 +132,7 @@ h2 {
   font-size: 2vw;
   line-height: 1.2;
   margin: 0;
-  padding: 1% 0;
+  padding: 0 0 3% 0;
 }
 
 h2 em {
