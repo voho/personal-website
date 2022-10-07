@@ -30,7 +30,7 @@ function Hero() {
         <h2>alias voho</h2>
         <div className="hero-skills">
           <div className="hero-links">
-            <h3>Creative Developer</h3>
+            <h3>Software Developer</h3>
             <ul>
               <li><FontAwesomeIcon icon={faLinkedin} size="2x" fixedWidth color='#0077B5' /> <a href="http://www.linkedin.com/in/vohocz">LinkedIn</a></li>
               <li><FontAwesomeIcon icon={faGithubAlt} size="2x" fixedWidth color='#000' /> <a href="https://github.com/voho">GitHub</a></li>
@@ -44,7 +44,7 @@ function Hero() {
             </ul>
           </div>
           <div className="hero-links">
-            <h3>Father</h3>
+            <h3>3&#215; Father</h3>
             <ul>
               <li><FontAwesomeIcon icon={faInstagramSquare} size="2x" fixedWidth color='#cd486b' /> <a href="https://www.instagram.com/vohocz/">Instagram</a></li>
             </ul>
