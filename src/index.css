@@ -1,7 +1,8 @@
 body {
-  background-color: #020B1A;
-  background: linear-gradient(30deg, #17172d, #dbb18e, #9BA5AE, #3E5879, #020B1A);
+  background-color: #000;
+  background: linear-gradient(30deg, #111, #666, #000, #111, #333);
   background-size: 400% 400%;
+  color: #000000;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 16pt;
   line-height: 1.5;
@@ -25,19 +26,18 @@ body {
 }
 
 a {
-  color: #3E5879;
+  color: black;
   text-decoration: none;
   transition: 300ms;
 }
 
 a:hover {
-  color: #AD4A28;
+  color: blue;
   transition: 300ms;
 }
 
 .hero {
-  background-color: #ddd;
-  box-shadow: 0 0 5em #eee;
+  background-color: #fff;
   min-height: 30em;
   margin: 1.6% 0;
   padding: 1%;
@@ -59,32 +59,33 @@ a:hover {
 
 .hero-image img {
   border-radius: 5pt;
-  box-shadow: 0 1ex 1em #9BA5AE;
   max-width: 100%;
   max-height: 50vh;
   min-width: 15em;
 }
 
 .hero-name {
-  color: gray;
-  padding: 1em;
+  color: #333;
   flex-grow: 1.5;
   flex-shrink: 0.5;
   min-width: 20em;
 }
 
 .hero-skills {
-  color: #9BA5AE;
-  padding: 1em;
-  flex-grow: 1;
-  flex-shrink: 0.5;
-  min-width: 15em;
+  color: #999;
+  column-gap: 1em;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-content: space-between;
+  justify-content: space-between;
+  align-items: stretch;
+  padding: 5vh 0;
 }
 
 .hero-links {
-  flex-grow: 0.5;
+  flex-grow: 1;
   flex-shrink: 0.5;
-  padding: 1em;
 }
 
 .hero-links ul {
@@ -97,13 +98,15 @@ a:hover {
   align-items: stretch;
   padding: 0;
   margin: 0;
+  text-align: left;
 }
 
 .hero-links ul li {
   display: flex;
   flex-direction: row;
   font-weight: bold;
-  column-gap: 1em;
+  font-size: 1.3vw;
+  column-gap: 5pt;
   place-items: center;
   list-style: none;
   flex-grow: 1;
@@ -130,6 +133,15 @@ h2 {
 h2 em {
   color: black;
   font-family: monospace;
+  font-style: normal;
+  font-weight: normal;
+}
+
+h3 {
+  font-size: 1.5vw;
+  line-height: 1.2;
+  margin: 0;
+  padding-bottom: 3vh;
   font-style: normal;
   font-weight: normal;
 }
