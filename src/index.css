@@ -1,6 +1,6 @@
 body {
   background-color: #000;
-  background: linear-gradient(30deg, #111, #666, #000, #111, #333);
+  background: radial-gradient(ellipse at bottom, #111, #666, #000, #111, #333);
   background-size: 400% 400%;
   color: #000000;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
@@ -38,16 +38,19 @@ a:hover {
 
 .hero {
   background-color: #fff;
+  background: radial-gradient(ellipse at top, #eee, #ddd, #fff, #eee, #ddd);
+  background-size: 400% 400%;
   min-height: 30em;
-  margin: 1.6% 0;
-  padding: 1%;
+  margin: 2% 0;
+  padding: 2%;
   display: flex;
   flex-direction: row;
   align-items: center;
   column-gap: 2em;
   row-gap: 1em;
   flex-wrap: wrap;
-  opacity: 0.9;
+  opacity: 0.75;
+  animation: sunset 50s ease infinite;
 }
 
 .hero-image {
