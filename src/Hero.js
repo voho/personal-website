@@ -1,19 +1,26 @@
 import React from 'react';
-import img1 from "./image/a1.png";
-import img2 from "./image/a2.png";
-import img3 from "./image/a3.png";
-import img4 from "./image/a4.png";
-import img5 from "./image/a5.png";
-import img6 from "./image/a6.png";
-import img7 from "./image/a7.png";
-import img8 from "./image/a8.png";
-import img9 from "./image/a9.png";
-import img10 from "./image/a10.png";
-import img11 from "./image/a11.png";
+import img1 from "./image/a1.jpg";
+import img2 from "./image/a2.jpg";
+import img3 from "./image/a3.jpg";
+import img4 from "./image/a4.jpg";
+import img5 from "./image/a5.jpg";
+import img6 from "./image/a6.jpg";
+import img7 from "./image/a7.jpg";
+import img1b from "./image/b1.jpg";
+import img2b from "./image/b2.jpg";
+import img3b from "./image/b3.jpg";
+import img4b from "./image/b4.jpg";
+import img5b from "./image/b5.jpg";
+import img6b from "./image/b6.jpg";
+import img7b from "./image/b7.jpg";
+import img8 from "./image/a8.jpg";
+import img9 from "./image/a9.jpg";
+import img10 from "./image/a10.jpg";
+import img11 from "./image/a11.jpg";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faGithubAlt, faItunesNote, faInstagramSquare, faSpotify, faLinkedin } from '@fortawesome/free-brands-svg-icons';
 
-const images = [img1, img2, img3, img4, img5, img6, img7, img8, img9, img10, img11];
+const images = [img1, img2, img3, img4, img5, img6, img7, img8, img9, img10, img11, img1b, img2b, img3b, img4b, img5b, img6b, img7b];
 
 function getRandomImage() {
   return images[Math.floor(Math.random() * images.length)];
