@@ -78,7 +78,6 @@ a:hover {
 }
 
 .hero-skills {
-  border-top: 0.5vh solid black;
   color: #999;
   column-gap: 1em;
   display: flex;
@@ -123,7 +122,7 @@ a:hover {
 
 h1 {
   color: black;
-  font-size: 3vw;
+  font-size: 3.2vw;
   line-height: 1.2;
   margin: 0;
   padding: 1% 0;
