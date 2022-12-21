@@ -18,7 +18,7 @@ import img9 from "./image/a9.jpg";
 import img10 from "./image/a10.jpg";
 import img11 from "./image/a11.jpg";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faGithubAlt, faItunesNote, faInstagramSquare, faSpotify, faLinkedin } from '@fortawesome/free-brands-svg-icons';
+import { faGithubAlt, faItunesNote, faInstagramSquare, faYoutube, faSpotify, faLinkedin } from '@fortawesome/free-brands-svg-icons';
 
 const images = [img1, img2, img3, img4, img5, img6, img7, img8, img9, img10, img11, img1b, img2b, img3b, img4b, img5b, img6b, img7b];
 
@@ -48,6 +48,7 @@ function Hero() {
             <ul>
               <li><FontAwesomeIcon icon={faSpotify} size="2x" fixedWidth color='#1DB954' /> <a href="https://open.spotify.com/artist/4OaWtKAgl8oGU9QTa4wXu4">Spotify</a></li>
               <li><FontAwesomeIcon icon={faItunesNote} size="2x" fixedWidth color='#D948DD' /> <a href="https://itunes.apple.com/us/artist/voho/id1213510083">iTunes</a></li>
+              <li><FontAwesomeIcon icon={faYoutube} size="2x" fixedWidth color='#FF0000' /> <a href="https://www.youtube.com/@vohomusic">YouTube</a></li>
             </ul>
           </div>
           <div className="hero-links">
