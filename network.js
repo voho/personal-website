@@ -1,520 +1,238 @@
-// network.js
-// Handles network data model: nodes, edges, packets
+// Simulates a small packet network floating in 3D and flattens it into "glow primitives"
+// that every renderer tier (WebGPU, WebGL, Canvas 2D) can draw.
+//
+// A primitive is 12 floats:
+//   ax, ay, bx, by   segment endpoints (a == b for a point); y spans -1..1, x spans -aspect..aspect
+//   ring             if > 0 the glow sits on a ring of this radius around the segment
+//   width            glow falloff width
+//   intensity
+//   tail             0..1, how strongly the glow fades from b towards a (comet tails)
+//   r, g, b, unused
 
-// Configuration Constants
-const CONFIG = {
-    // Node placement
-    NODE_MIN_DIST: 60,    // Minimum distance between nodes
-    NODE_MARGIN: 30,      // Margin from canvas edges
-    NODE_MAX_TRIES: 100,  // Max attempts to place a node
-    NODE_MAX_CONN: 4,     // Maximum connections per node
-    
-    // Packet behavior
-    MAX_HOPS: 3,          // Maximum redirects before removal
-    PACKET_SPEED: 0.5,    // Movement speed (progress units per second)
-    
-    // Animation durations
-    RIPPLE_DURATION: 0.7, // How long ripples last (seconds)
-    BLINK_DURATION: 0.5,  // How long blinks last (seconds)
-    
-    // Node movement
-    NODE_MAX_SPEED: 0.5,         // Maximum node speed
-    NODE_ACCELERATION: 0.05,     // How quickly nodes change direction
-    NODE_DAMPING: 0.98,          // Friction to prevent excessive speed
-    NODE_DRIFT_RADIUS: 30,       // Maximum distance from original position
-    NODE_RETURN_FORCE: 0.01      // Force pulling nodes back to original position
-};
+export const FLOATS_PER_PRIM = 12;
 
-// Effect queues for renderer
-// networkEffects.ripples: {node, time, color, type}, networkEffects.blinks: {node, time}
-export const networkEffects = {
-    ripples: [],
-    blinks: []
-};
+const Z_NEAR = 1.2;
+const Z_FAR = 5.5;
+const Z_FOCUS = 2.6;         // depth that is rendered sharp; everything else blurs with distance from it
+const SPREAD = 1.25;         // nodes extend past the screen edge so camera movement never reveals a border
+const MAX_LINKS = 4;
+const HOP_SECONDS = 1.6;
+const RIPPLE_SECONDS = 1.4;
+const TAIL_LENGTH = 0.25;    // fraction of an edge
+const BLUR = 0.03;
 
-/**
- * Determines if two line segments (ab and cd) cross each other
- * @param {Node} a - First point of first segment
- * @param {Node} b - Second point of first segment
- * @param {Node} c - First point of second segment
- * @param {Node} d - Second point of second segment
- * @returns {boolean} - True if the segments cross
- */
-function edgesCross(a, b, c, d) {
-    // Helper: Determine if three points make a counter-clockwise turn
-    function ccw(p1, p2, p3) {
-        return (p3.y - p1.y) * (p2.x - p1.x) > (p2.y - p1.y) * (p3.x - p1.x);
-    }
-    
-    // Segments cross if they share no endpoints and straddle each other
-    return (
-        a !== c && a !== d && b !== c && b !== d &&
-        ccw(a, c, d) !== ccw(b, c, d) &&
-        ccw(a, b, c) !== ccw(a, b, d)
-    );
-}
+const COOL_COLORS = [
+    [0.25, 0.72, 1.0],
+    [0.35, 0.5, 1.0],
+    [0.62, 0.45, 1.0],
+    [0.2, 0.9, 0.8]
+];
+const WARM_COLOR = [1.0, 0.55, 0.3];
+const EDGE_COLOR = [0.3, 0.55, 0.9];
+const DUST_COLOR = [0.6, 0.75, 1.0];
 
+const random = (min, max) => min + Math.random() * (max - min);
+const pick = (items) => items[Math.floor(Math.random() * items.length)];
 
-/**
- * Represents a node in the network
- */
-export class Node {
-    /**
-     * Create a new node
-     * @param {number} id - Unique identifier
-     * @param {number} x - X coordinate
-     * @param {number} y - Y coordinate
-     * @param {string} color - CSS color string
-     */
-    constructor(id, x, y, color) {
-        this.id = id;
-        this.x = x;
-        this.y = y;
-        this.originalX = x;     // Store original position for drift constraints
-        this.originalY = y;     // Store original position for drift constraints
-        this.vx = 0;            // X velocity component
-        this.vy = 0;            // Y velocity component
-        this.color = color;
-        this.connections = [];
-        this.lastEmitTime = -Infinity; // Track when this node last emitted a packet
-    }
-}
-
-/**
- * Represents a connection between two nodes
- */
-export class Edge {
-    /**
-     * Create a new edge
-     * @param {Node} source - Source node
-     * @param {Node} target - Target node
-     */
-    constructor(source, target) {
-        this.source = source;
-        this.target = target;
-    }
-}
-
-/**
- * Represents a packet traveling through the network
- */
-export class Packet {
-    /**
-     * Create a new packet
-     * @param {Node} source - Starting node
-     * @param {Node} target - Next node to visit
-     * @param {string} color - CSS color string
-     */
-    constructor(source, target, color) {
-        this.source = source;         // Current source node
-        this.target = target;         // Current target node
-        this.progress = 0;            // Progress from 0 (start) to 1 (arrived)
-        this.color = color;           // Visual color
-        this.active = true;           // Whether packet is still active
-        this.hops = 0;                // Number of redirects so far
-        this.prevNode = null;         // Previous node (to avoid backtracking)
-        this.removed = false;         // Whether packet was removed due to hop limit
-        this.removalEffect = null;    // Visual effect for removal {type, node, time}
-        this.finalTargetId = null;    // ID of the ultimate destination node
-    }
-}
-
-/**
- * Main network simulation class
- */
 export class Network {
-    /**
-     * Create a new network
-     * @param {number} width - Canvas width
-     * @param {number} height - Canvas height
-     * @param {number} nodeCount - Number of nodes to create
-     */
-    constructor(width, height, nodeCount = 10) {
-        this.width = width;
-        this.height = height;
-        this.nodeCount = nodeCount;
+    constructor(nodeCount, dustCount) {
+        this.time = random(0, 1000);
         this.nodes = [];
         this.edges = [];
         this.packets = [];
-        this.initialize();
-    }
+        this.ripples = [];
+        this.dust = [];
+        this.maxPackets = Math.ceil(nodeCount / 4);
+        this.pointer = { x: 0, y: 0 };   // where the visitor points, -1..1
+        this.look = { x: 0, y: 0 };      // smoothed pointer, drives the camera
 
-    /**
-     * Initialize the network with nodes and edges
-     */
-    initialize() {
-        this.nodes = [];
-        this.edges = [];
-        this.packets = [];
-        
-        this._placeNodes();
-        this._normalizeNodePositions();
-        this._createEdges();
-    }
-    
-    /**
-     * Resize the network to fit a new canvas size without regenerating the structure
-     * @param {number} width - New canvas width
-     * @param {number} height - New canvas height
-     */
-    resizeCanvas(width, height) {
-        // Update dimensions
-        this.width = width;
-        this.height = height;
-        
-        // Only adjust node positions, keeping the same network structure
-        if (this.nodes.length > 0) {
-            // Reset velocities to prevent erratic movement after resize
-            for (const node of this.nodes) {
-                node.vx = 0;
-                node.vy = 0;
-            }
-            
-            // Rescale all nodes to fill the entire canvas and update original positions
-            this._normalizeNodePositions(true);
+        this._placeNodes(nodeCount);
+        this._linkNodes();
+        for (let i = 0; i < dustCount; i++) {
+            this.dust.push(this._randomPoint());
+        }
+
+        const capacity = dustCount + nodeCount + this.edges.length + 3 * this.maxPackets + 16;
+        this.prims = new Float32Array(capacity * FLOATS_PER_PRIM);
+        this.primCount = 0;
+
+        // Start with traffic already flowing, so the first (or the only, with reduced motion) frame looks alive.
+        for (let i = 0; i < 50; i++) {
+            this.step(0.1);
         }
     }
 
-    /**
-     * Place nodes with minimum distance constraints
-     * @private
-     */
-    _placeNodes() {
-        for (let i = 0; i < this.nodeCount; i++) {
-            let x, y, tries = 0, ok = false;
-            
-            // Try to find a position that's not too close to other nodes
-            while (!ok && tries < CONFIG.NODE_MAX_TRIES) {
-                x = Math.random() * this.width;
-                y = Math.random() * this.height;
-                ok = true;
-                
-                for (const other of this.nodes) {
-                    const dx = x - other.x;
-                    const dy = y - other.y;
-                    if (Math.sqrt(dx*dx + dy*dy) < CONFIG.NODE_MIN_DIST) {
-                        ok = false;
-                        break;
-                    }
-                }
-                tries++;
+    _randomPoint() {
+        return {
+            u: random(-1, 1), v: random(-1, 1), z: random(Z_NEAR, Z_FAR),
+            speed: random(0.05, 0.15),
+            phaseX: random(0, 6.28), phaseY: random(0, 6.28), phaseZ: random(0, 6.28),
+            sx: 0, sy: 0, inv: 0
+        };
+    }
+
+    _placeNodes(count) {
+        // Keep nodes apart on screen so they do not clump; give up after a few tries rather than loop forever.
+        const minDistance = 0.9 / Math.sqrt(count);
+        for (let i = 0; i < count; i++) {
+            let node;
+            for (let attempt = 0; attempt < 20; attempt++) {
+                node = this._randomPoint();
+                if (this.nodes.every(o => Math.hypot(o.u - node.u, o.v - node.v) > minDistance)) break;
             }
-            
-            // Create the node with a random color
-            const node = new Node(i, x, y, `hsl(${Math.random()*360},80%,60%)`);
+            node.color = Math.random() < 0.1 ? WARM_COLOR : pick(COOL_COLORS);
+            node.links = [];
+            node.flash = 0;
             this.nodes.push(node);
         }
     }
 
-    /**
-     * Normalize node positions to fit within margins
-     * @private
-     * @param {boolean} [updateOriginalPositions=true] - Whether to update original positions
-     */
-    _normalizeNodePositions(updateOriginalPositions = true) {
-        if (this.nodes.length === 0) return;
-        
-        // Find the bounds of all nodes
-        let minX = Math.min(...this.nodes.map(n => n.x));
-        let maxX = Math.max(...this.nodes.map(n => n.x));
-        let minY = Math.min(...this.nodes.map(n => n.y));
-        let maxY = Math.max(...this.nodes.map(n => n.y));
-        
-        const spanX = maxX - minX || 1; // Avoid division by zero
-        const spanY = maxY - minY || 1;
-        
-        // Scale and translate all nodes to fit within margins
-        // Don't preserve aspect ratio - stretch to fill the entire canvas
+    _linkNodes() {
+        const distance = (a, b) => Math.hypot((a.u * a.z - b.u * b.z) * 1.6, a.v * a.z - b.v * b.z, a.z - b.z);
         for (const node of this.nodes) {
-            // Calculate new position scaled to fill the entire canvas
-            const newX = CONFIG.NODE_MARGIN + ((node.x - minX) / spanX) * (this.width - 2 * CONFIG.NODE_MARGIN);
-            const newY = CONFIG.NODE_MARGIN + ((node.y - minY) / spanY) * (this.height - 2 * CONFIG.NODE_MARGIN);
-            
-            // Update current position
-            node.x = newX;
-            node.y = newY;
-            
-            // Update original position if requested (for resize operations)
-            if (updateOriginalPositions) {
-                node.originalX = newX;
-                node.originalY = newY;
+            const wanted = 1 + Math.floor(Math.random() * 2);
+            const nearest = this.nodes
+                .filter(o => o !== node && !node.links.some(l => l.node === o))
+                .sort((a, b) => distance(node, a) - distance(node, b));
+            for (const other of nearest) {
+                if (node.links.length >= wanted) break;
+                if (other.links.length >= MAX_LINKS) continue;
+                const edge = { a: node, b: other, heat: 0 };
+                node.links.push({ node: other, edge });
+                other.links.push({ node, edge });
+                this.edges.push(edge);
             }
         }
     }
 
-    /**
-     * Create edges between nodes
-     * @private
-     */
-    _createEdges() {
-        for (const node of this.nodes) {
-            // Sort neighbors by distance
-            const neighbors = this.nodes.filter(n => n !== node)
-                .sort((a, b) => this._getDistanceSquared(node, a) - this._getDistanceSquared(node, b));
-            
-            // Randomly choose how many connections this node should have (1-4)
-            const maxConns = 1 + Math.floor(Math.random() * CONFIG.NODE_MAX_CONN);
-            let conns = 0;
-            
-            // Connect to closest neighbors that don't create crossing edges
-            for (let i = 0; i < neighbors.length && conns < maxConns; i++) {
-                const neighbor = neighbors[i];
-                
-                if (!node.connections.includes(neighbor)) {
-                    if (!this._edgeWouldCross(node, neighbor)) {
-                        this._addEdge(node, neighbor);
-                        conns++;
-                    }
-                }
-            }
+    step(dt) {
+        this.time += dt;
+
+        const ease = 1 - Math.exp(-dt * 2);
+        this.look.x += (this.pointer.x - this.look.x) * ease;
+        this.look.y += (this.pointer.y - this.look.y) * ease;
+
+        const cool = Math.exp(-dt * 1.5);
+        for (const node of this.nodes) node.flash *= cool;
+        for (const edge of this.edges) edge.heat *= cool;
+
+        for (const ripple of this.ripples) ripple.age += dt / RIPPLE_SECONDS;
+        this.ripples = this.ripples.filter(r => r.age < 1);
+
+        for (const packet of this.packets) {
+            packet.progress += dt / HOP_SECONDS;
+            packet.edge.heat = 1;
+            if (packet.progress >= 1) this._arrive(packet);
+        }
+        this.packets = this.packets.filter(p => p.hops >= 0);
+
+        if (this.packets.length < this.maxPackets && Math.random() < dt * this.maxPackets * 0.25) {
+            this._emit();
         }
     }
 
-    /**
-     * Calculate squared distance between two nodes
-     * @private
-     * @param {Node} a - First node
-     * @param {Node} b - Second node
-     * @returns {number} - Squared distance
-     */
-    _getDistanceSquared(a, b) {
-        const dx = a.x - b.x;
-        const dy = a.y - b.y;
-        return dx*dx + dy*dy;
-    }
-
-    /**
-     * Check if an edge between two nodes would cross any existing edges
-     * @private
-     * @param {Node} a - First node
-     * @param {Node} b - Second node
-     * @returns {boolean} - True if the edge would cross any existing edge
-     */
-    _edgeWouldCross(a, b) {
-        for (const edge of this.edges) {
-            if (edgesCross(a, b, edge.source, edge.target)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Add an edge between two nodes
-     * @private
-     * @param {Node} a - First node
-     * @param {Node} b - Second node
-     */
-    _addEdge(a, b) {
-        a.connections.push(b);
-        b.connections.push(a);
-        this.edges.push(new Edge(a, b));
-    }
-
-    /**
-     * Update node positions with gentle random movement
-     * @param {number} dt - Time delta in seconds
-     */
-    updateNodePositions(dt) {
-        for (const node of this.nodes) {
-            // Add small random acceleration
-            node.vx += (Math.random() - 0.5) * CONFIG.NODE_ACCELERATION;
-            node.vy += (Math.random() - 0.5) * CONFIG.NODE_ACCELERATION;
-            
-            // Apply damping to prevent excessive speed
-            node.vx *= CONFIG.NODE_DAMPING;
-            node.vy *= CONFIG.NODE_DAMPING;
-            
-            // Limit maximum speed
-            const speed = Math.sqrt(node.vx * node.vx + node.vy * node.vy);
-            if (speed > CONFIG.NODE_MAX_SPEED) {
-                node.vx = (node.vx / speed) * CONFIG.NODE_MAX_SPEED;
-                node.vy = (node.vy / speed) * CONFIG.NODE_MAX_SPEED;
-            }
-            
-            // Calculate distance from original position
-            const dx = node.x - node.originalX;
-            const dy = node.y - node.originalY;
-            const distanceFromOrigin = Math.sqrt(dx * dx + dy * dy);
-            
-            // Apply return force proportional to distance from original position
-            if (distanceFromOrigin > 0) {
-                const returnForce = CONFIG.NODE_RETURN_FORCE * Math.pow(distanceFromOrigin / CONFIG.NODE_DRIFT_RADIUS, 2);
-                node.vx -= (dx / distanceFromOrigin) * returnForce;
-                node.vy -= (dy / distanceFromOrigin) * returnForce;
-            }
-            
-            // Hard limit on maximum distance from original position
-            if (distanceFromOrigin > CONFIG.NODE_DRIFT_RADIUS) {
-                node.x = node.originalX + (dx / distanceFromOrigin) * CONFIG.NODE_DRIFT_RADIUS;
-                node.y = node.originalY + (dy / distanceFromOrigin) * CONFIG.NODE_DRIFT_RADIUS;
-                
-                // Bounce velocity when hitting the boundary
-                node.vx *= -0.5;
-                node.vy *= -0.5;
-            } else {
-                // Update position
-                node.x += node.vx;
-                node.y += node.vy;
-            }
-        }
-    }
-
-    /**
-     * Update all packets in the network
-     * @param {number} dt - Time delta in seconds
-     * @param {Object} effects - Visual effects container
-     */
-    updatePackets(dt, effects) {
-        // Update active packets
-        for (let i = 0; i < this.packets.length; i++) {
-            const packet = this.packets[i];
-            if (!packet.active) continue;
-            
-            // Move the packet
-            packet.progress += dt * CONFIG.PACKET_SPEED;
-            
-            // Check if packet has arrived at its target node
-            if (packet.progress >= 1) {
-                this._handlePacketArrival(packet, effects);
-            }
-        }
-        
-        // Remove inactive packets (except those with active removal effects)
-        this._cleanupPackets();
-    }
-
-    /**
-     * Handle a packet arriving at its target node
-     * @private
-     * @param {Packet} packet - The packet that arrived
-     * @param {Object} effects - Visual effects container
-     */
-    _handlePacketArrival(packet, effects) {
-        packet.progress = 1;
-        const atNode = packet.target;
-        
-        // Create ripple effect at the node
-        effects.ripples.push({
-            node: atNode, 
-            time: 0, 
-            color: packet.color, 
-            type: (atNode.id === packet.finalTargetId ? 'target' : 'normal')
+    _emit() {
+        const from = pick(this.nodes);
+        if (!from.links.length) return;
+        const link = pick(from.links);
+        from.flash = 1;
+        this.packets.push({
+            from, to: link.node, edge: link.edge, progress: 0,
+            hops: 1 + Math.floor(Math.random() * 4),
+            color: Math.random() < 0.2 ? WARM_COLOR : pick(COOL_COLORS)
         });
-        
-        // If this is the final destination, mark packet as inactive
-        if (atNode.id === packet.finalTargetId) {
-            packet.active = false;
+    }
+
+    _arrive(packet) {
+        const at = packet.to;
+        at.flash = 1;
+        packet.hops--;
+        const onward = at.links.filter(l => l.node !== packet.from);
+        if (packet.hops < 0 || !onward.length) {
+            packet.hops = -1;
+            this.ripples.push({ node: at, age: 0, color: packet.color });
             return;
         }
-        
-        // Otherwise, redirect the packet
-        packet.hops++;
-        
-        // If hop limit reached, remove with blink effect
-        if (packet.hops > CONFIG.MAX_HOPS) {
-            this._removePacketWithEffect(packet, atNode, effects);
-            return;
+        const link = pick(onward);
+        packet.from = at;
+        packet.to = link.node;
+        packet.edge = link.edge;
+        packet.progress -= 1;
+    }
+
+    /**
+     * Projects the scene and fills this.prims / this.primCount.
+     * @param {number} aspect - canvas width / height
+     * @param {number} pixel - size of one canvas pixel in primitive units (2 / canvas height)
+     */
+    project(aspect, pixel) {
+        const t = this.time;
+        const yaw = 0.08 * Math.sin(t * 0.07) + this.look.x * 0.05;
+        const cos = Math.cos(yaw);
+        const sin = Math.sin(yaw);
+        const camX = 0.15 * Math.sin(t * 0.05) + this.look.x * 0.15;
+        const camY = 0.1 * Math.cos(t * 0.043) - this.look.y * 0.12;
+
+        const place = (point) => {
+            const x = point.u * point.z * aspect * SPREAD + 0.12 * Math.sin(t * point.speed + point.phaseX);
+            const y = point.v * point.z * SPREAD + 0.12 * Math.sin(t * point.speed * 0.8 + point.phaseY);
+            const z = point.z - Z_FOCUS + 0.15 * Math.sin(t * point.speed * 0.6 + point.phaseZ);
+            point.inv = 1 / (Z_FOCUS + x * sin + z * cos);
+            point.sx = (x * cos - z * sin - camX) * point.inv;
+            point.sy = (y - camY) * point.inv;
+        };
+
+        const prims = this.prims;
+        let offset = 0;
+        // inv is 1 / depth: it scales sizes for perspective and tells how far out of focus the primitive is.
+        const put = (ax, ay, bx, by, inv, ring, size, intensity, tail, color) => {
+            if (offset >= prims.length) return;
+            const sharp = size * inv;
+            // Never go thinner than a pixel, that would shimmer; dim instead.
+            const width = Math.max(sharp + BLUR * Math.abs(inv - 1 / Z_FOCUS), pixel * 0.75);
+            prims[offset++] = ax;
+            prims[offset++] = ay;
+            prims[offset++] = bx;
+            prims[offset++] = by;
+            prims[offset++] = ring;
+            prims[offset++] = width;
+            prims[offset++] = intensity * (sharp / width) * Math.min(1, inv * Z_FOCUS);
+            prims[offset++] = tail;
+            prims[offset++] = color[0];
+            prims[offset++] = color[1];
+            prims[offset++] = color[2];
+            prims[offset++] = 0;
+        };
+
+        for (const speck of this.dust) {
+            place(speck);
+            put(speck.sx, speck.sy, speck.sx, speck.sy, speck.inv, 0, 0.004, 0.5, 0, DUST_COLOR);
         }
-        
-        // Find valid neighbors to forward to
-        const neighbors = this._getValidNeighbors(atNode, packet.prevNode);
-        
-        if (neighbors.length === 0) {
-            packet.active = false;
-            return;
+
+        for (const node of this.nodes) place(node);
+
+        for (const { a, b, heat } of this.edges) {
+            put(a.sx, a.sy, b.sx, b.sy, (a.inv + b.inv) / 2, 0, 0.003, 0.24 + 0.25 * heat, 0, EDGE_COLOR);
         }
-        
-        // Forward to a random neighbor
-        const next = neighbors[Math.floor(Math.random() * neighbors.length)];
-        packet.prevNode = atNode;
-        packet.source = atNode;
-        packet.target = next;
-        packet.progress = 0;
-    }
 
-    /**
-     * Remove a packet with a visual effect
-     * @private
-     * @param {Packet} packet - The packet to remove
-     * @param {Node} node - The node where the effect should appear
-     * @param {Object} effects - Visual effects container
-     */
-    _removePacketWithEffect(packet, node, effects) {
-        packet.active = false;
-        packet.removed = true;
-        packet.removalEffect = {type: 'blink', node: node, time: 0};
-        effects.blinks.push(packet.removalEffect);
-    }
-
-    /**
-     * Get valid neighbors for forwarding a packet
-     * @private
-     * @param {Node} node - Current node
-     * @param {Node} prevNode - Previous node (to avoid backtracking)
-     * @returns {Node[]} - Array of valid neighbor nodes
-     */
-    _getValidNeighbors(node, prevNode) {
-        const neighbors = [];
-        for (let j = 0; j < node.connections.length; j++) {
-            if (node.connections[j] !== prevNode) {
-                neighbors.push(node.connections[j]);
-            }
+        for (const { node, age, color } of this.ripples) {
+            const fade = (1 - age) * (1 - age);
+            put(node.sx, node.sy, node.sx, node.sy, node.inv, 0.2 * age * node.inv, 0.006, 0.7 * fade, 0, color);
         }
-        return neighbors;
-    }
 
-    /**
-     * Remove inactive packets that don't have active effects
-     * @private
-     */
-    _cleanupPackets() {
-        const newPackets = [];
-        for (let i = 0; i < this.packets.length; i++) {
-            const p = this.packets[i];
-            if (p.active || (p.removed && p.removalEffect && p.removalEffect.time < CONFIG.BLINK_DURATION)) {
-                newPackets.push(p);
-            }
+        for (const { from, to, progress, color } of this.packets) {
+            const start = Math.max(0, progress - TAIL_LENGTH);
+            put(
+                from.sx + (to.sx - from.sx) * start, from.sy + (to.sy - from.sy) * start,
+                from.sx + (to.sx - from.sx) * progress, from.sy + (to.sy - from.sy) * progress,
+                from.inv + (to.inv - from.inv) * progress, 0, 0.007, 1.6, 1, color
+            );
         }
-        this.packets = newPackets;
-    }
 
-    /**
-     * Create and send a packet from a random source to a random target
-     */
-    sendRandomPacket() {
-        if (this.nodes.length < 2) return;
-        
-        // Select random source and target nodes
-        const source = this._getRandomNode();
-        let target = this._getRandomNode(source); // Exclude source
-        
-        // Ensure source has connections
-        if (!source.connections.length) return;
-        
-        // Create and send the packet
-        const firstHop = source.connections[Math.floor(Math.random() * source.connections.length)];
-        const color = target.color;
-        const packet = new Packet(source, firstHop, color);
-        packet.finalTargetId = target.id;
-        this.packets.push(packet);
-        
-        // Track emission time
-        source.lastEmitTime = performance.now ? performance.now() : Date.now();
-    }
+        for (const node of this.nodes) {
+            put(node.sx, node.sy, node.sx, node.sy, node.inv, 0, 0.015, 0.9 + 1.3 * node.flash, 0, node.color);
+        }
 
-    /**
-     * Get a random node from the network
-     * @private
-     * @param {Node} [exclude] - Node to exclude from selection
-     * @returns {Node} - A random node
-     */
-    _getRandomNode(exclude = null) {
-        let node;
-        do {
-            node = this.nodes[Math.floor(Math.random() * this.nodes.length)];
-        } while (node === exclude && this.nodes.length > 1);
-        return node;
+        this.primCount = offset / FLOATS_PER_PRIM;
     }
 }
-console.log('network.js loaded');
