@@ -7,7 +7,8 @@
 
 body {
     font-family: 'Arial', sans-serif;
-    background-color: #000;
+    /* Shows through until the animated background is ready, and stays if it cannot run at all. */
+    background: #020308 radial-gradient(ellipse at 50% 35%, #0a1a2e 0%, #050a14 55%, #020308 100%) fixed;
     color: #fff;
     height: 100vh;
     position: relative;
@@ -23,10 +24,13 @@ body {
     height: 100vh;
     z-index: 0;
     display: block;
-    background-color: #000;
     pointer-events: none; /* Let UI elements be clickable */
-    /* Optional: add a subtle border or shadow for visibility */
-    /* box-shadow: 0 0 20px 2px #333; */
+    opacity: 0;
+    transition: opacity 1.5s ease;
+}
+
+#background-canvas.ready {
+    opacity: 1;
 }
 
 .container {
